@@ -15,11 +15,11 @@ A trivia game for Youtube live stream chats that runs on a Windows computer.
 5. **Run** `YoutubeTriviaBot.exe`.
 
 ## Commands
-!Trivia - start the game
-!stop - Stop the game
-!myscore - Show your score
-!add question#answer - Add a question (if allowed)
-!highscores - List top scores
+!Trivia - start the game  
+!stop - Stop the game  
+!myscore - Show your score  
+!add question#answer - Add a question (if allowed)  
+!highscores - List top scores  
 
 ## Setup Instructions
 ### 1. Google OAuth2 Credentials
