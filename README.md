@@ -1,21 +1,28 @@
 # youtube-trivia-bot
 
-This is a trivia game that runs in the Youtube Live chat message box. It is written in C# runs on a Windows computer. In the current version, it runs as a command line program.
-Trivia questions and answers are put into two text files, questions.txt and answers.txt. The question and answer should each be on the same line of each file. 
+A trivia game for Youtube live stream chats that runs in Windows. 
 
-The chat bot listens for commands in the channel. Available commands are the following:
-!trivia - start the trivia game
-!stop - stop the trivia game
-!myscore - display the user's score
-!add - add a question and answer to the game (can be restricted to only moderators if desired)
-!highscores - list all of the highest scores and user names.
+## Features
+- Responds to commands in the youtube chat.
+- Questions and answers are stored in two text files on admin's computer.
+- Questions can be added in the chatroom, by moderators only if enabled.
 
-Installing the game requires a dedicated Youtube account. Also, the name of the LiveChatID of the channel will be needed. This can be looked up in the Google Developers Console.
+## Quick Start
+1. **Download and extract** the bot.
+2. **Configure Google OAuth2** (see below).
+3. **Edit configuration** (`YoutubeTriviaBot.exe.config`).
+4. **Add your questions/answers** to `questions.txt` and `answers.txt`.
+5. **Run** `YoutubeTriviaBot.exe`.
 
-Here are some step-by-step instructions on how to configure the bot in the Youtube API Console
+## Commands
+!Trivia - start the game
+!stop - Stop the game
+!myscore - Show your score
+!add question#answer - Add a question (if allowed)
+!highscores - List top scores
 
-Step 1, we need to create an OAuth2 credential for the youtube/google account that will be the trivia bot and download the client_secret.json
-
+## Setup Instructions
+### 1. Google OAuth2 Credentials
 Log in to google with the user that will be the bot. It should be a user that has moderator or owner access to the channel since these can send messages more frequently. In google search for Youtube API Console Click the link called Youtube Data API Overview - Google Developers On the left click Get Auth Credentials. 
 Where it says "Open the Credentials page" click that
 Click Create to create a project
@@ -40,7 +47,8 @@ Click the blue Enable box
 
 If you have multiple google ID's it's important to keep an eye on the upper right to
 make sure it doesn't switch to another one while doing these steps
-2) find the livechatid for the live stream chat using the Youtube API Console (Live stream must be created first)
+### 2. Find Your LiveChatID
+find the livechatid for the live stream chat using the Youtube API Console (Live stream must be created first)
 Each livestream chat has a unique id. You can get this id using the Youtube API Console. 
 Make sure you are logged in to youtube with the channel owner's account
 In API Explorer click
@@ -59,7 +67,7 @@ Don't put question mark at the end of the questions. The bot adds the question m
 The cursor should be on the next line at the end of the document. There shouldn't be any extra lines.
 Using NotePad++ seems to show more if there are hidden lines or text that could interfere with reading 
 the file. 
-7) Customize the configuration file
+### 3. Edit configuration file (triviabot.config)
 Open YoutubeTriviaBot.exe.config 
 Edit the following values. Use double backslashes for directory names. Also might want to use a directory with a short simple path
 with no spaces or special characters, etc. 
@@ -76,6 +84,7 @@ botName - set this to match the name of the bot's user name, for example Trivia 
 restrictedAdd - set to "yes" and only the name in the questionAuthor field will be able to add questions. Set to "no" and anyone can use the add question command
 questionAuthor - the bot will only add questions from this user name if restrictedAdd is set to "yes"
 
+### 4. Run the program
 8) Double click the YoutubeTriviaBot.exe to run the program
 After about 10 seconds it will finish startup
 If you have the correct LiveChatID you should see messages in the console window
@@ -84,14 +93,7 @@ There aren't any commands that can be entered in the console, everything is done
 in the chat. 
 To exit the program hit any key
 
+### 5. Demostration Video
+www.youtube.com/video
 
-Commands
-
-!trivia - start the trivia
-!stop - stop the trivia
-!myscore - shows the user's score
-!highscores - shows the top 5 scores
-!add question#answer - adds a question and answer from the chat. Put a # separating the question and answer, with no question mark
-
-
-
+### FAQ / Troubleshooting
