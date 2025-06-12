@@ -1,14 +1,22 @@
 # youtube-trivia-bot
 
-Installation Steps
+This is a trivia game that runs in the Youtube Live chat message box. It is written in C# runs on a Windows computer. In the current version, it runs as a command line program.
+Trivia questions and answers are put into two text files, questions.txt and answers.txt. The question and answer should each be on the same line of each file. 
 
-1) create an OAuth2 credential for the youtube/google account that will be the trivia bot and download the client_secret.json
+The chat bot listens for commands in the channel. Available commands are the following:
+!trivia - start the trivia game
+!stop - stop the trivia game
+!myscore - display the user's score
+!add - add a question and answer to the game (can be restricted to only moderators if desired)
+!highscores - list all of the highest scores and user names.
 
-Log in to google with the user that will be the bot. It should be a user that has
-moderator or owner access to the channel since these can send messages more frequently.
-In google search for Youtube API Console
-Click the link called Youtube Data API Overview - Google Developers
-On the left click Get Auth Credentials
+Installing the game requires a dedicated Youtube account. Also, the name of the LiveChatID of the channel will be needed. This can be looked up in the Google Developers Console.
+
+Here are some step-by-step instructions on how to configure the bot in the Youtube API Console
+
+Step 1, we need to create an OAuth2 credential for the youtube/google account that will be the trivia bot and download the client_secret.json
+
+Log in to google with the user that will be the bot. It should be a user that has moderator or owner access to the channel since these can send messages more frequently. In google search for Youtube API Console Click the link called Youtube Data API Overview - Google Developers On the left click Get Auth Credentials. 
 Where it says "Open the Credentials page" click that
 Click Create to create a project
 Accept the terms of service
@@ -32,9 +40,7 @@ Click the blue Enable box
 
 If you have multiple google ID's it's important to keep an eye on the upper right to
 make sure it doesn't switch to another one while doing these steps
-
 2) find the livechatid for the live stream chat using the Youtube API Console (Live stream must be created first)
-
 Each livestream chat has a unique id. You can get this id using the Youtube API Console. 
 Make sure you are logged in to youtube with the channel owner's account
 In API Explorer click
@@ -44,26 +50,15 @@ In the broadcastStatus box select Active (or Upcoming if it is still upcoming)
 Click Execute at the bottom
 Scroll down and find the value for liveChatId
 Copy this value to notepad temporarily
-
 3) install Microsoft .NET 4.6.1 if not installed
-
-
 4) create a directory for the trivia bot, such as c:\triviabot
-
-
-
 5) uncompress the trivia bot zip file into the triviabot directory
-
-
-
 6) Add questions and answers to the questions.txt and answers.txt.
 The question and answer should be on the same line in each file.
 Don't put question mark at the end of the questions. The bot adds the question mark. 
 The cursor should be on the next line at the end of the document. There shouldn't be any extra lines.
 Using NotePad++ seems to show more if there are hidden lines or text that could interfere with reading 
 the file. 
-
-
 7) Customize the configuration file
 Open YoutubeTriviaBot.exe.config 
 Edit the following values. Use double backslashes for directory names. Also might want to use a directory with a short simple path
