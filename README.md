@@ -1,6 +1,6 @@
-# youtube-trivia-bot
+# Youtube Trivia Bot
 
-A trivia game for Youtube live stream chats that runs in Windows. 
+A trivia game for Youtube live stream chats that runs on a Windows computer. 
 
 ## Features
 - Responds to commands in the youtube chat.
