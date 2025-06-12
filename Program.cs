@@ -352,53 +352,130 @@ namespace TriviaBotApp
 
         public async Task SendMsg(string message)
         {
-            if (_startUpMsgHoldBack == 0)
+            if (_startUpMsgHoldBack != 0)
             {
-                Console.WriteLine($"Sent message: {message}");
-                UserCredential credential;
-
-                try
-                {
-                    using (var stream = new FileStream(ClientSecretsFile, FileMode.Open, FileAccess.Read))
-                    {
-                        credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
-                            GoogleClientSecrets.Load(stream).Secrets,
-                            new[] { YouTubeService.Scope.Youtube },
-                            "user",
-                            CancellationToken.None,
-                            new FileDataStore(this.GetType().ToString())
-                        );
-                    }
-
-                    var youtubeService = new YouTubeService(new BaseClientService.Initializer()
-                    {
-                        HttpClientInitializer = credential,
-                        ApplicationName = this.GetType().ToString()
-                    });
-
-                    var comments = new LiveChatMessage
-                    {
-                        Snippet = new LiveChatMessageSnippet
-                        {
-                            TextMessageDetails = new LiveChatTextMessageDetails
-                            {
-                                MessageText = message
-                            },
-                            LiveChatId = "YOUR_LIVE_CHAT_ID"
-                        }
-                    };
-
-                    var request = youtubeService.LiveChatMessages.Insert(comments, "snippet,authorDetails");
-                    await request.ExecuteAsync();
-                }
-                catch (Exception ex)
-                {
-                    Console.WriteLine($"Error sending message: {ex.Message}");
-                }
+                Console.WriteLine($"HELD BACK: {message}");
+                return;
             }
-            else
+
+            Console.WriteLine($"SENT: {message}");
+            UserCredential credential;
+
+            using (var stream = new FileStream(ClientSecretsFile, FileMode.Open, FileAccess.Read))
             {
-                Console.WriteLine($"Held message: {message}");
+                credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
+                    GoogleClientSecrets.Load(stream).Secrets,
+                    new[] { YouTubeService.Scope.Youtube },
+                    "user",
+                    CancellationToken.None,
+                    new FileDataStore(this.GetType().ToString())
+                );
+            }
+
+            var youtubeService = new YouTubeService(new BaseClientService.Initializer()
+            {
+                HttpClientInitializer = credential,
+                ApplicationName = this.GetType().ToString()
+            });
+
+            var liveChatMessage = new LiveChatMessage
+            {
+                Snippet = new LiveChatMessageSnippet
+                {
+                    Type = "textMessageEvent",
+                    LiveChatId = "YOUR_LIVE_CHAT_ID",
+                    TextMessageDetails = new LiveChatTextMessageDetails
+                    {
+                        MessageText = message
+                    }
+                }
+            };
+
+            await youtubeService.LiveChatMessages.Insert(liveChatMessage, "snippet").ExecuteAsync();
+        }
+
+        public async Task GetMsg(string curAnswer)
+        {
+            UserCredential credential;
+
+            using (var stream = new FileStream(ClientSecretsFile, FileMode.Open, FileAccess.Read))
+            {
+                credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
+                    GoogleClientSecrets.Load(stream).Secrets,
+                    new[] { YouTubeService.Scope.Youtube },
+                    "user",
+                    CancellationToken.None,
+                    new FileDataStore(this.GetType().ToString())
+                );
+            }
+
+            var ytService = new YouTubeService(new BaseClientService.Initializer()
+            {
+                HttpClientInitializer = credential,
+                ApplicationName = this.GetType().ToString()
+            });
+
+            string liveChatId = "YOUR_LIVE_CHAT_ID";
+            var chatRequest = ytService.LiveChatMessages.List(liveChatId, "id,snippet,authorDetails");
+            chatRequest.PageToken = _nextPageToken;
+
+            var chatResponse = await chatRequest.ExecuteAsync();
+            _nextPageToken = chatResponse.NextPageToken;
+
+            foreach (var message in chatResponse.Items)
+            {
+                var messageId = message.Id;
+                var displayName = message.AuthorDetails.DisplayName;
+                var displayMessage = message.Snippet.DisplayMessage;
+                var messageTime = message.Snippet.PublishedAt ?? DateTime.MinValue;
+
+                if (displayName != "Trivia Bot" &&
+                    !_recentMessages.Contains(messageId) &&
+                    _startUpMsgHoldBack == 0)
+                {
+                    StackMessages(messageId);
+                    Console.WriteLine($"{DateTime.Now} Received: {displayMessage}");
+
+                    if (displayMessage.IndexOf(curAnswer, StringComparison.OrdinalIgnoreCase) >= 0 &&
+                        _done == 0 &&
+                        _questionAnswered == 0)
+                    {
+                        _questionAnswered = 1;
+                        _done = 1;
+
+                        var delay = (DateTime.Now - messageTime).Seconds;
+                        await SendMsg($"You got it, {displayName}! [{delay}s] The correct answer was: {curAnswer}.");
+                        AddPoint(displayName);
+                    }
+                    else if (displayMessage.Contains("!trivia"))
+                    {
+                        _done = 1;
+                        _stage = 0;
+                        await SendMsg("Trivia Bot started! First question coming up...");
+                        _questionTimer = new Timer(QuestionTimer_Tick, null, 0, 10000);
+                    }
+                    else if (displayMessage.Contains("!stop"))
+                    {
+                        _done = 1;
+                        await SendMsg($"Trivia stopped by {displayName}");
+                        _questionTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+                    }
+                    else if (displayMessage.Contains("!myscore"))
+                    {
+                        var score = GetUserScore(displayName);
+                        await SendMsg($"{displayName}'s score: {score}");
+                    }
+                    else if (displayMessage.Contains("!add"))
+                    {
+                        AddQuestion(displayMessage);
+                        await SendMsg("Question added.");
+                    }
+                    else if (displayMessage.Contains("!highscores"))
+                    {
+                        var scores = GetScores();
+                        await SendMsg(scores);
+                    }
+                }
             }
         }
     }
