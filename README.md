@@ -1,9 +1,6 @@
-# YoutubeTriviaBot
-
-Yotube Live Chat Trivia Bot version 1.0
+# youtube-trivia-bot
 
 Installation Steps
-
 
 1) create an OAuth2 credential for the youtube/google account that will be the trivia bot and download the client_secret.json
 
