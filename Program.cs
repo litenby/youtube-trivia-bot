@@ -16,105 +16,6 @@ using System.Xml.Linq;
 
 namespace tb01
 {
-
-    public class Airport
-    {
-        public string code { get; set; }
-        public string lat { get; set; }
-        public string lon { get; set; }
-        public string name { get; set; }
-        public string city { get; set; }
-        public string state { get; set; }
-        public string country { get; set; }
-        public string woeid { get; set; }
-        public string tz { get; set; }
-        public string phone { get; set; }
-        public string type { get; set; }
-        public string email { get; set; }
-        public string url { get; set; }
-        public string runway_length { get; set; }
-        public string elev { get; set; }
-        public string icao { get; set; }
-        public string direct_flights { get; set; }
-        public string carriers { get; set; }
-
-        public String getAirportInfo(string icao_input)
-        {
-            string[] parts = icao_input.Split(' '); // remove the !info from the ICAO code
-
-            var jsonText = File.ReadAllText("c:\\triviabot\\airports.json");
-            var records = JsonConvert.DeserializeObject<IList<Airport>>(jsonText);
-
-            var s = records.FirstOrDefault(x => x.icao == parts[1]);
-
-            string icao_output = s.icao + " | " + s.name + " | " + s.city + ", " + s.state + " | " + s.country + " | Elev " + s.elev + "ft | Runway " + s.runway_length + " ft | Direct Flights " + s.direct_flights + " | Carriers " + s.carriers + " | Phone " + s.phone + " | Coords " + s.lat + ", " + s.lon;
-            return icao_output;
-        }
-    }
-
-    // For getting the live weather reports about any airport
-
-    public class AirportWx
-    {
-        public String getAirportWx(string message)
-        {
-            string[] parts = message.Split(' ');
-
-            string WEBSERVICE_URL = "https://avwx.rest/api/metar/" + parts[1];
-            try
-            {
-                var webRequest = System.Net.WebRequest.Create(WEBSERVICE_URL);
-                if (webRequest != null)
-                {
-                    webRequest.Method = "GET";
-                    webRequest.Timeout = 20000;
-                    webRequest.ContentType = "application/json";
-                    webRequest.Headers.Add("Authorization", "Basic XXXXXXX=");
-                    using (System.IO.Stream s = webRequest.GetResponse().GetResponseStream())
-                    {
-
-                        using (System.IO.StreamReader sr = new System.IO.StreamReader(s))
-                        {
-                            var jsonResponse = sr.ReadToEnd();
-                            string json = jsonResponse;
-                            JObject o = JObject.Parse(jsonResponse);
-                            string Station = o.SelectToken("Station").ToString();
-                            string Altimeter = o.SelectToken("Altimeter").ToString();
-                            string Dewpoint = o.SelectToken("Dewpoint").ToString();
-                            string FlightRules = o.SelectToken("Flight-Rules").ToString();
-                            string Temperature = o.SelectToken("Temperature").ToString();
-                            string Time = o.SelectToken("Time").ToString();
-                            string Visibility = o.SelectToken("Visibility").ToString();
-                            string Winddirection = o.SelectToken("Wind-Direction").ToString();
-                            string Windgust = o.SelectToken("Wind-Gust").ToString();
-                            string Windspeed = o.SelectToken("Wind-Speed").ToString();
-
-                            string currentMetar = Station + " | " +
-                               Time + " | Flt Rules: " + FlightRules +
-                                           " | Temp:  " + Temperature + "C " +
-                                           " | Alt: " + Altimeter + "inHg " +
-                                           " | Dew: " + Dewpoint +
-                                           " | Vis: " + Visibility + "sm " +
-                                           " | Wind: " + Winddirection + " at "
-                                           + Windspeed + "kts";
-                            return currentMetar;
-                        }
-                    }
-                }
-                else
-                {
-                    string blah = "";
-                    return blah;
-                }
-            }
-            catch (Exception ex)
-            {
-                // Console.WriteLine(ex.ToString());
-                return ex.ToString();
-            }
-        }
-    }
-
     internal class TriviaBot
     {
         Timer Timer1;
@@ -122,32 +23,31 @@ namespace tb01
         Timer Timer3;
         Timer Timer4;
         int firstConnect = 0;
-        String nextpagetoken; // ?
+        String nextpagetoken;
         int stage = 0;
         int done = 1;
-        String currentQuestion = "0";
-        String currentAnswer = "0";
+        String currentQuestion = "";
+        String currentAnswer = "";
         int currentQuestionLine = 0;
         String[] recentMessages = new string[75];
         int questionAnswered = 0;
         DateTime askTime;
         String hint1 = "";
         String msgToSend = "";
-        int startUpMsgHoldBack = 1; // Prevents messages from being sent to channel during first few seconds of program. Avoid flood of messages from reading pages. 
-
+        int startUpMsgHoldBack = 1; 
 
         [STAThread]
         static void Main(string[] args)
         {
             Console.WriteLine("Trivia Bot");
             Console.WriteLine("==================================");
-            TriviaBot crap = new TriviaBot();
-            crap.start();
+            TriviaBot newTriviaBot = new TriviaBot();
+            newTriviaBot.start();
             Console.WriteLine("Press any key to exit...");
             Console.ReadKey();
         }
 
-        void stackEm(String input1)
+        void stackMessages(String input1)
         {
 
             for (int i = 0; i < 74; i++)
@@ -299,7 +199,7 @@ namespace tb01
             try
             {
                 getMsg(currentAnswer);
-                //Console.WriteLine(DateTime.Now + " getting new messages");
+                Console.WriteLine(DateTime.Now + " getting new messages");
             }
             catch (AggregateException ex)
             {
@@ -538,7 +438,7 @@ namespace tb01
             chatMessages.PageToken = nextpagetoken;
             var chatResponse = await chatMessages.ExecuteAsync();
             nextpagetoken = chatResponse.NextPageToken;
-            //Console.WriteLine("nextpagetoken is " + nextpagetoken);
+            Console.WriteLine("nextpagetoken is " + nextpagetoken);
             long? pollinginterval = chatResponse.PollingIntervalMillis;
             PageInfo pageInfo = chatResponse.PageInfo;
             List<LiveChatMessageListResponse> messages = new List<LiveChatMessageListResponse>();
@@ -556,10 +456,10 @@ namespace tb01
                 int toSeconds = timeSince.Seconds;
                 Console.WriteLine(DateTime.Now + "   msg time: " + messageTime + "  ago: " + timeSince);
 
-                // && toSeconds < 33 && toSeconds > 25 
+                
                 if (displayName != "Trivia Bot" && recentMessages.Contains(messageId).Equals(false) && startUpMsgHoldBack == 0)
                 {
-                    // stackEm(messageId);
+                    // stackMessages(messageId);
                     Console.WriteLine("recent message: " + messageTime + " Delay: " + toSeconds + "  " + displayMessage);
 
                     // if (displayMessage.Contains(curAnswer) && done == 0 && questionAnswered == 0)
@@ -621,14 +521,7 @@ namespace tb01
                         string t4 = getScores();
                         sendMsg(t4);
                     }
-                    else
-
-                    if (displayMessage.Contains("!wx") || displayMessage.Contains("!weather"))
-                    {
-                        AirportWx b = new AirportWx();
-                        string t2 = b.getAirportWx(displayMessage);
-                        sendMsg(t2);
-                    }
+                    
                 }
             }
         }
