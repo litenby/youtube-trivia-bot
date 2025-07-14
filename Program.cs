@@ -1,4 +1,11 @@
-﻿using System;
+﻿using Google.Apis.Auth.OAuth2;
+using Google.Apis.Services;
+using Google.Apis.Util.Store;
+using Google.Apis.YouTube.v3;
+using Google.Apis.YouTube.v3.Data;
+using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -6,336 +13,349 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
-using Google.Apis.Auth.OAuth2;
-using Google.Apis.Services;
-using Google.Apis.Util.Store;
-using Google.Apis.YouTube.v3;
-using Google.Apis.YouTube.v3.Data;
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
-namespace TriviaBotApp
+namespace youtube_trivia_bot
 {
     internal class TriviaBot
     {
-        private Timer _messageTimer;
-        private Timer _questionTimer;
-        private Timer _commandTimer;
-        private Timer _startupMessageTimer;
+        Timer Timer1;
+        Timer Timer2;
+        Timer Timer3;
+        Timer Timer4;
 
-        private int _firstConnect = 0;
-        private string _nextPageToken;
-        private int _stage = 0;
-        private int _done = 1;
-        private string _currentQuestion = "";
-        private string _currentAnswer = "";
-        private int _currentQuestionLine = 0;
-        private string[] _recentMessages = new string[75];
-        private int _questionAnswered = 0;
-        private DateTime _askTime;
-        private string _hint1 = "";
-        private string _msgToSend = "";
-        private int _startUpMsgHoldBack = 1;
-        private readonly string _basePath = @"c:\triviabot\";
-        private string QuestionsFile => Path.Combine(_basePath, "questions.txt");
-        private string AnswersFile => Path.Combine(_basePath, "answers.txt");
-        private string ScoresFile => Path.Combine(_basePath, "scores.txt");
-        private string ClientSecretsFile => Path.Combine(_basePath, "client_secrets.json");
+        int firstConnect = 0;
+        String nextpagetoken;
+        int stage = 0;
+        int done = 1;
+        String currentQuestion = "0";
+        String currentAnswer = "0";
+        int currentQuestionLine = 0;
+        String[] recentMessages = new string[75];
+        int questionAnswered = 0;
+        DateTime askTime;
+        String hint1 = "";
+        String msgToSend = "";
+        int startUpMsgHoldBack = 1;
+        private AppConfig config;
+        private string QuestionsFile => Path.Combine(config.BasePath, "questions.txt");
+        private string AnswersFile => Path.Combine(config.BasePath, "answers.txt");
+        private string ScoresFile => Path.Combine(config.BasePath, "scores.txt");
+        private string ClientSecretsFile => Path.Combine(config.BasePath, "client_secrets.json");
+
 
         [STAThread]
         static void Main(string[] args)
         {
             Console.WriteLine("Trivia Bot");
-            Console.WriteLine("==========");
+            Console.WriteLine("==================================");
+            Console.WriteLine("Loading configuration file");
 
-            var triviaBot = new TriviaBot();
-            triviaBot.Start();
-
+            TriviaBot crap = new TriviaBot();
+            crap.start();
             Console.WriteLine("Press any key to exit...");
             Console.ReadKey();
         }
 
-        private void StackMessages(string input)
+        private void LoadConfig()
+        {
+            string configPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "appsettings.json");
+            if (!File.Exists(configPath))
+            {
+                Console.WriteLine("Config file not found: " + configPath);
+                return;
+            }
+
+            string json = File.ReadAllText(configPath);
+            config = JsonConvert.DeserializeObject<AppConfig>(json);
+            Console.WriteLine("Loaded config. LiveChatId: " + (string.IsNullOrEmpty(config.LiveChatId) ? "[none]" : "[loaded]"));
+            Console.WriteLine("LiveChatID: " + config.LiveChatId);
+        }
+
+        void stackEm(String input1)
         {
             for (int i = 0; i < 74; i++)
             {
-                _recentMessages[i + 1] = _recentMessages[i];
+                recentMessages[i + 1] = recentMessages[i];
             }
-            _recentMessages[0] = input;
+            recentMessages[0] = input1;
         }
 
-        public string GetScores()
+        public string getScores()
         {
-            var entries = File.ReadAllLines(ScoresFile);
-            var orderedEntries = entries.OrderByDescending(x => int.Parse(x.Split(',')[1]));
-
-            var topScores = orderedEntries.Take(5);
-            var highScores = "High scores: ";
-            foreach (var score in topScores)
+            string[] Entry = File.ReadAllLines(ScoresFile);
+            var orderedEntries = Entry.OrderByDescending(x => int.Parse(x.Split(',')[1]));
+            var myList = orderedEntries.Take(5);
+            String highScores = "High scores: ";
+            foreach (var score in myList)
             {
                 highScores += score + " | ";
             }
-
             return highScores;
         }
 
-        private void AddQuestion(string newQuestion)
+        void addQuestion(String newQuestion)
         {
-            var counter = 0;
+            int counter = 0;
+            string myLine = "";
             string question = "";
             string answer = "";
-            using (var file = new StreamReader(QuestionsFile))
+            System.IO.StreamReader file = new System.IO.StreamReader(QuestionsFile);
+
+            while ((myLine = file.ReadLine()) != null)
             {
-                while ((file.ReadLine()) != null)
-                {
-                    counter++;
-                }
+                counter++;
             }
 
-            var values = newQuestion.Split('#');
-            question = values[0].Substring(5);
+            string[] values = newQuestion.Split('#');
+            question = values[0];
             answer = values[1];
-
+            question = question.Remove(0, 5);
+            file.Close();
             File.AppendAllText(AnswersFile, answer + Environment.NewLine);
             File.AppendAllText(QuestionsFile, question + Environment.NewLine);
         }
 
-        private static void UpdateLine(string newText, string fileName, int lineToEdit)
+        static void lineChanger(string newText, string fileName, int line_to_edit)
         {
-            var lines = File.ReadAllLines(fileName);
-            lines[lineToEdit] = newText;
-            File.WriteAllLines(fileName, lines);
+            string[] arrLine = File.ReadAllLines(fileName);
+            arrLine[line_to_edit] = newText;
+            File.WriteAllLines(fileName, arrLine);
         }
 
-        public int GetUserScore(string userName)
+        public int getUserScore(String userName)
         {
-            int score = 0;
-            using (var file = new StreamReader(ScoresFile))
+            int theirScore = 0;
+            int counter = 0;
+            string myLine = "";
+            System.IO.StreamReader file = new System.IO.StreamReader(ScoresFile);
+
+            while ((myLine = file.ReadLine()) != null)
             {
-                string line;
-                while ((line = file.ReadLine()) != null)
+                if (myLine.Contains(userName))
                 {
-                    if (line.Contains(userName))
-                    {
-                        var values = line.Split(',');
-                        int.TryParse(values[1], out score);
-                    }
+                    string[] values = myLine.Split(',');
+                    Int32.TryParse(values[1], out theirScore);
                 }
+                counter++;
             }
 
-            return score;
+            file.Close();
+            return theirScore;
         }
 
-        public void AddPoint(string userName)
+        public void addPoint(String userName)
         {
-            int score = 0;
+            int temp2 = 0;
+            int counter = 0;
             int foundLine = -1;
-            string replacement = "";
-            string newUserLine = "";
+            string myLine = "";
+            String replacement = "";
+            String newUserLine = "";
             int destinationLine = 0;
+            System.IO.StreamReader file = new System.IO.StreamReader(ScoresFile);
 
-            using (var file = new StreamReader(ScoresFile))
+            while ((myLine = file.ReadLine()) != null)
             {
-                string line;
-                int counter = 0;
-                while ((line = file.ReadLine()) != null)
+                if (myLine.Contains(userName))
                 {
-                    if (line.Contains(userName))
-                    {
-                        foundLine = counter;
-                        var values = line.Split(',');
-                        int.TryParse(values[1], out score);
-                        score++;
-                        replacement = $"{values[0]},{score}";
-                    }
-                    counter++;
+                    foundLine = counter;
+                    string[] values = myLine.Split(',');
+                    Int32.TryParse(values[1], out temp2);
+                    temp2++;
+                    replacement = values[0] + "," + temp2;
                 }
+                counter++;
             }
+
+            file.Close();
 
             if (foundLine == -1)
             {
-                newUserLine = $"{userName},1";
-                destinationLine = File.ReadAllLines(ScoresFile).Length + 1;
+                newUserLine = userName + "," + "1";
+                destinationLine = counter + 1;
                 File.AppendAllText(ScoresFile, newUserLine + Environment.NewLine);
             }
             else
             {
-                UpdateLine(replacement, ScoresFile, foundLine);
+                lineChanger(replacement, ScoresFile, foundLine);
+                foundLine = -1;
             }
         }
 
-        public void GenerateHints()
+        public void generateHints()
         {
-            var sb = new StringBuilder(_currentAnswer);
+            StringBuilder sb = new StringBuilder(currentAnswer);
             for (int i = 1; i < sb.Length - 1; i++)
             {
                 sb[i] = '_';
             }
-            _hint1 = sb.ToString();
+            hint1 = sb.ToString();
         }
 
-        public void GetQuestion()
+        public void getQuestion()
         {
             var lines = File.ReadAllLines(QuestionsFile);
-            var randomLineNumber = new Random().Next(0, lines.Length - 1);
-            _currentQuestion = lines[randomLineNumber];
-            _currentQuestionLine = randomLineNumber;
+            var r = new Random();
+            var randomLineNumber = r.Next(0, lines.Length - 1);
+            var line = lines[randomLineNumber];
+            currentQuestion = line;
+            currentQuestionLine = randomLineNumber;
         }
 
-        public void GetAnswer()
+        public void getAnswer()
         {
             var answerLines = File.ReadAllLines(AnswersFile);
-            _currentAnswer = answerLines[_currentQuestionLine];
+            currentAnswer = answerLines[currentQuestionLine];
         }
 
-        private void MessageTimer_Tick(object state)
+        void Timer1_Tick(object state)
         {
             try
             {
-                GetMsg(_currentAnswer);
-                Console.WriteLine($"{DateTime.Now} - Retrieving new messages");
+                getMsg(currentAnswer);
+                Console.WriteLine(DateTime.Now + " getting new messages");
             }
             catch (AggregateException ex)
             {
                 foreach (var e in ex.InnerExceptions)
                 {
-                    Console.WriteLine($"Error: {e.Message}");
+                    Console.WriteLine("Error: " + e.Message);
                 }
             }
             GC.Collect();
             Thread.Sleep(500);
         }
 
-        private void CommandTimer_Tick(object state)
+        void Timer3_Tick(object state)
         {
             try
             {
-                _startUpMsgHoldBack = 0;
-                Console.WriteLine("Messages are now allowed to be sent.");
-                _commandTimer.Change(Timeout.Infinite, Timeout.Infinite);
+                startUpMsgHoldBack = 0;
+                Console.WriteLine("Messages now allowed to be sent.");
+                Timer3.Change(Timeout.Infinite, Timeout.Infinite);
             }
             catch (AggregateException ex)
             {
                 foreach (var e in ex.InnerExceptions)
                 {
-                    Console.WriteLine($"Error: {e.Message}");
+                    Console.WriteLine("Error: " + e.Message);
                 }
             }
             GC.Collect();
             Thread.Sleep(500);
         }
 
-        private void StartupMessageTimer_Tick(object state)
+        void Timer4_Tick(object state)
         {
             try
             {
-                SendMsg("Commands: !trivia !stop !myscore");
+                sendMsg("Commands:  !trivia  !stop  !myscore ");
             }
             catch (AggregateException ex)
             {
                 foreach (var e in ex.InnerExceptions)
                 {
-                    Console.WriteLine($"Error: {e.Message}");
+                    Console.WriteLine("Error: " + e.Message);
                 }
             }
             GC.Collect();
             Thread.Sleep(500);
         }
 
-        private void QuestionTimer_Tick(object state)
+        void Timer2_Tick(object state)
         {
-            if (_done == 1)
+            if (done == 1)
             {
-                GetQuestion();
-                GetAnswer();
-                GenerateHints();
-                _stage = 0;
-                _done = 0;
-                _questionAnswered = 0;
+                getQuestion();
+                getAnswer();
+                generateHints();
+                stage = 0;
+                done = 0;
+                questionAnswered = 0;
             }
-            else if (_stage == 0 && _done != 1)
+            else if (stage == 0 && done != 1)
             {
-                _stage++;
-                _askTime = DateTime.Now;
+                stage++;
+                askTime = DateTime.Now;
                 try
                 {
-                    _msgToSend = $"{_currentQuestion}?";
-                    SendMsg(_msgToSend);
+                    msgToSend = currentQuestion + "?";
+                    sendMsg(msgToSend);
                 }
                 catch (AggregateException ex)
                 {
                     foreach (var e in ex.InnerExceptions)
                     {
-                        Console.WriteLine($"Error: {e.Message}");
+                        Console.WriteLine("Error: " + e.Message);
                     }
                 }
                 GC.Collect();
                 Thread.Sleep(500);
             }
-            else if (_stage == 1 && _done != 1)
+            else if (stage == 1 && done != 1)
             {
-                _stage++;
+                stage++;
                 try
                 {
-                    // SendMsg("hint 1");
+                    // sendMsg("hint 1");
                 }
                 catch (AggregateException ex)
                 {
                     foreach (var e in ex.InnerExceptions)
                     {
-                        Console.WriteLine($"Error: {e.Message}");
+                        Console.WriteLine("Error: " + e.Message);
                     }
                 }
                 GC.Collect();
                 Thread.Sleep(500);
             }
-            else if (_stage == 2 && _done != 1)
+            else if (stage == 2 && done != 1)
             {
-                _stage++;
+                stage++;
                 try
                 {
-                    SendMsg($"Hint: {_hint1}");
+                    sendMsg("Hint: " + hint1);
                 }
                 catch (AggregateException ex)
                 {
                     foreach (var e in ex.InnerExceptions)
                     {
-                        Console.WriteLine($"Error: {e.Message}");
+                        Console.WriteLine("Error: " + e.Message);
                     }
                 }
                 GC.Collect();
                 Thread.Sleep(500);
             }
-            else if (_stage == 3 && _done != 1)
+            else if (stage == 3 && done != 1)
             {
-                _stage++;
+                stage++;
                 try
                 {
-                    // SendMsg("hint 3");
+                    // sendMsg("hint 3");
                 }
                 catch (AggregateException ex)
                 {
                     foreach (var e in ex.InnerExceptions)
                     {
-                        Console.WriteLine($"Error: {e.Message}");
+                        Console.WriteLine("Error: " + e.Message);
                     }
                 }
                 GC.Collect();
                 Thread.Sleep(500);
             }
-            else if (_stage == 4 && _done != 1)
+            else if (stage == 4 && done != 1)
             {
-                _stage = 0;
-                _done = 1;
+                stage = 0;
+                done = 1;
                 try
                 {
-                    SendMsg($"Time is up! The correct answer was: {_currentAnswer}");
+                    sendMsg("Time is up! The correct answer was:  " + currentAnswer);
                 }
                 catch (AggregateException ex)
                 {
                     foreach (var e in ex.InnerExceptions)
                     {
-                        Console.WriteLine($"Error: {e.Message}");
+                        Console.WriteLine("Error: " + e.Message);
                     }
                 }
                 GC.Collect();
@@ -343,61 +363,58 @@ namespace TriviaBotApp
             }
         }
 
-        private void Start()
+        private void start()
         {
-            _messageTimer = new Timer(MessageTimer_Tick, null, 3000, 2000);
-            _commandTimer = new Timer(CommandTimer_Tick, null, 15000, 15000);
-            _startupMessageTimer = new Timer(StartupMessageTimer_Tick, null, 30000, 3600000);
+            Timer1 = new Timer(Timer1_Tick, null, 3000,2000);
+            Timer3 = new Timer(Timer3_Tick, null, 15000, 15000);
+            Timer4 = new Timer(Timer4_Tick, null, 30000, 3600000);
+            LoadConfig();
         }
 
-        public async Task SendMsg(string message)
+    public async Task sendMsg(string myMessage)
         {
-            if (_startUpMsgHoldBack != 0)
+            if (startUpMsgHoldBack == 0)
             {
-                Console.WriteLine($"HELD BACK: {message}");
-                return;
-            }
-
-            Console.WriteLine($"SENT: {message}");
-            UserCredential credential;
-
-            using (var stream = new FileStream(ClientSecretsFile, FileMode.Open, FileAccess.Read))
-            {
-                credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
-                    GoogleClientSecrets.Load(stream).Secrets,
-                    new[] { YouTubeService.Scope.Youtube },
-                    "user",
-                    CancellationToken.None,
-                    new FileDataStore(this.GetType().ToString())
-                );
-            }
-
-            var youtubeService = new YouTubeService(new BaseClientService.Initializer()
-            {
-                HttpClientInitializer = credential,
-                ApplicationName = this.GetType().ToString()
-            });
-
-            var liveChatMessage = new LiveChatMessage
-            {
-                Snippet = new LiveChatMessageSnippet
+                Console.WriteLine("Sent Message: " + myMessage);
+                UserCredential credential;
+                using (var stream = new FileStream(ClientSecretsFile, FileMode.Open, FileAccess.Read))
                 {
-                    Type = "textMessageEvent",
-                    LiveChatId = "YOUR_LIVE_CHAT_ID",
-                    TextMessageDetails = new LiveChatTextMessageDetails
-                    {
-                        MessageText = message
-                    }
+                    credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
+                        GoogleClientSecrets.Load(stream).Secrets,
+                        new[] { YouTubeService.Scope.Youtube },
+                        "user",
+                        CancellationToken.None,
+                        new FileDataStore(this.GetType().ToString())
+                    );
                 }
-            };
 
-            await youtubeService.LiveChatMessages.Insert(liveChatMessage, "snippet").ExecuteAsync();
+                firstConnect = 1;
+
+                var youtubeService = new YouTubeService(new BaseClientService.Initializer()
+                {
+                    HttpClientInitializer = credential,
+                    ApplicationName = this.GetType().ToString()
+                });
+
+                LiveChatMessage comments = new LiveChatMessage();
+                LiveChatMessageSnippet mySnippet = new LiveChatMessageSnippet();
+                LiveChatTextMessageDetails txtDetails = new LiveChatTextMessageDetails();
+                txtDetails.MessageText = myMessage;
+                mySnippet.TextMessageDetails = txtDetails;
+                mySnippet.LiveChatId = config.LiveChatId;
+                mySnippet.Type = "textMessageEvent";
+                comments.Snippet = mySnippet;
+                comments = await youtubeService.LiveChatMessages.Insert(comments, "snippet").ExecuteAsync();
+            }
+            else
+            {
+                Console.WriteLine("Message not sent until program startup complete: " + myMessage);
+            }
         }
 
-        public async Task GetMsg(string curAnswer)
+        public async Task getMsg(String curAnswer)
         {
             UserCredential credential;
-
             using (var stream = new FileStream(ClientSecretsFile, FileMode.Open, FileAccess.Read))
             {
                 credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
@@ -415,65 +432,71 @@ namespace TriviaBotApp
                 ApplicationName = this.GetType().ToString()
             });
 
-            string liveChatId = "YOUR_LIVE_CHAT_ID";
-            var chatRequest = ytService.LiveChatMessages.List(liveChatId, "id,snippet,authorDetails");
-            chatRequest.PageToken = _nextPageToken;
+            String liveChatId = config.LiveChatId;
+            var chatMessages = ytService.LiveChatMessages.List(liveChatId, "id,snippet,authorDetails");
+            chatMessages.PageToken = nextpagetoken;
+            var chatResponse = await chatMessages.ExecuteAsync();
+            nextpagetoken = chatResponse.NextPageToken;
 
-            var chatResponse = await chatRequest.ExecuteAsync();
-            _nextPageToken = chatResponse.NextPageToken;
+            long? pollinginterval = chatResponse.PollingIntervalMillis;
+            PageInfo pageInfo = chatResponse.PageInfo;
+            List<LiveChatMessageListResponse> messages = new List<LiveChatMessageListResponse>();
+            Console.WriteLine(chatResponse.PageInfo.TotalResults + " total messages " + chatResponse.PageInfo.ResultsPerPage + " results per page" + nextpagetoken);
 
-            foreach (var message in chatResponse.Items)
+            foreach (var chatMessage in chatResponse.Items)
             {
-                var messageId = message.Id;
-                var displayName = message.AuthorDetails.DisplayName;
-                var displayMessage = message.Snippet.DisplayMessage;
-                var messageTime = message.Snippet.PublishedAt ?? DateTime.MinValue;
+                string messageId = chatMessage.Id;
+                string displayName = chatMessage.AuthorDetails.DisplayName;
+                string displayMessage = chatMessage.Snippet.DisplayMessage;
+                System.DateTime messageTime = chatMessage.Snippet.PublishedAt.Value;
 
-                if (displayName != "Trivia Bot" &&
-                    !_recentMessages.Contains(messageId) &&
-                    _startUpMsgHoldBack == 0)
+                var now = DateTime.Now;
+                var timeSince = now - messageTime;
+                int toSeconds = timeSince.Seconds;
+
+                if (displayName != config.DisplayName && recentMessages.Contains(messageId).Equals(false) && startUpMsgHoldBack == 0)
                 {
-                    StackMessages(messageId);
-                    Console.WriteLine($"{DateTime.Now} Received: {displayMessage}");
+                    Console.WriteLine("recent message: " + messageTime + " Delay: " + toSeconds + "  " + displayMessage);
 
-                    if (displayMessage.IndexOf(curAnswer, StringComparison.OrdinalIgnoreCase) >= 0 &&
-                        _done == 0 &&
-                        _questionAnswered == 0)
+                    if ((displayMessage.IndexOf(curAnswer, StringComparison.OrdinalIgnoreCase) >= 0) && done == 0 && questionAnswered == 0)
                     {
-                        _questionAnswered = 1;
-                        _done = 1;
-
-                        var delay = (DateTime.Now - messageTime).Seconds;
-                        await SendMsg($"You got it, {displayName}! [{delay}s] The correct answer was: {curAnswer}.");
-                        AddPoint(displayName);
+                        questionAnswered = 1;
+                        done = 1;
+                        String output1 = "You got it, " + displayName + "! [" + toSeconds + "secs] The correct answer was: " + curAnswer + ".";
+                        sendMsg(output1);
+                        addPoint(displayName);
                     }
                     else if (displayMessage.Contains("!trivia"))
                     {
-                        _done = 1;
-                        _stage = 0;
-                        await SendMsg("Trivia Bot started! First question coming up...");
-                        _questionTimer = new Timer(QuestionTimer_Tick, null, 0, 10000);
+                        done = 1;
+                        stage = 0;
+                        String msg = "Trivia Bot started! First question coming up...";
+                        sendMsg(msg);
+                        Timer2 = new Timer(new TimerCallback(Timer2_Tick), null, 0, 10000);
                     }
                     else if (displayMessage.Contains("!stop"))
                     {
-                        _done = 1;
-                        await SendMsg($"Trivia stopped by {displayName}");
-                        _questionTimer?.Change(Timeout.Infinite, Timeout.Infinite);
+                        done = 1;
+                        String msg = "Trivia Stopped by " + displayName;
+                        sendMsg(msg);
+                        Timer2.Change(Timeout.Infinite, Timeout.Infinite);
                     }
                     else if (displayMessage.Contains("!myscore"))
                     {
-                        var score = GetUserScore(displayName);
-                        await SendMsg($"{displayName}'s score: {score}");
+                        int s1 = getUserScore(displayName);
+                        String msg = displayName + "'s score: " + s1;
+                        sendMsg(msg);
                     }
                     else if (displayMessage.Contains("!add"))
                     {
-                        AddQuestion(displayMessage);
-                        await SendMsg("Question added.");
+                        addQuestion(displayMessage);
+                        String msg = "Question added.";
+                        sendMsg(msg);
                     }
                     else if (displayMessage.Contains("!highscores"))
                     {
-                        var scores = GetScores();
-                        await SendMsg(scores);
+                        string t4 = getScores();
+                        sendMsg(t4);
                     }
                 }
             }
