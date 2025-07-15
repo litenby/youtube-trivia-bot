@@ -18,25 +18,30 @@ namespace youtube_trivia_bot
 {
     internal class TriviaBot
     {
+        
+        int firstConnect = 0;
+        int currentQuestionLine = 0;
+        int stage = 0;
+        int done = 1;
+        int questionAnswered = 0;
+        int warmupDelay = 1;
+
+        String nextpagetoken;
+        String currentQuestion = "0";
+        String currentAnswer = "0";
+        String[] recentMessages = new string[75];
+        String hint1 = "";
+        String msgToSend = "";
+
+        DateTime askTime;
+
         Timer Timer1;
         Timer Timer2;
         Timer Timer3;
         Timer Timer4;
 
-        int firstConnect = 0;
-        String nextpagetoken;
-        int stage = 0;
-        int done = 1;
-        String currentQuestion = "0";
-        String currentAnswer = "0";
-        int currentQuestionLine = 0;
-        String[] recentMessages = new string[75];
-        int questionAnswered = 0;
-        DateTime askTime;
-        String hint1 = "";
-        String msgToSend = "";
-        int startUpMsgHoldBack = 1;
         private AppConfig config;
+
         private string QuestionsFile => Path.Combine(config.BasePath, "questions.txt");
         private string AnswersFile => Path.Combine(config.BasePath, "answers.txt");
         private string ScoresFile => Path.Combine(config.BasePath, "scores.txt");
@@ -46,13 +51,12 @@ namespace youtube_trivia_bot
         [STAThread]
         static void Main(string[] args)
         {
-            Console.WriteLine("Trivia Bot");
-            Console.WriteLine("==================================");
-            Console.WriteLine("Loading configuration file");
+            Console.WriteLine("Youtube Trivia Bot");
+            Console.WriteLine("==================");
 
-            TriviaBot crap = new TriviaBot();
-            crap.start();
-            Console.WriteLine("Press any key to exit...");
+            TriviaBot tb = new TriviaBot();
+            tb.start();
+            Console.WriteLine("Trivia Bot is running. Press any key to exit the program.");
             Console.ReadKey();
         }
 
@@ -67,11 +71,12 @@ namespace youtube_trivia_bot
 
             string json = File.ReadAllText(configPath);
             config = JsonConvert.DeserializeObject<AppConfig>(json);
-            Console.WriteLine("Loaded config. LiveChatId: " + (string.IsNullOrEmpty(config.LiveChatId) ? "[none]" : "[loaded]"));
-            Console.WriteLine("LiveChatID: " + config.LiveChatId);
+            Console.WriteLine("Loaded configuration file. LiveChatId status: " + (string.IsNullOrEmpty(config.LiveChatId) ? "[none]" : "[loaded]"));
+            Console.WriteLine("LiveChatId: " + config.LiveChatId);
         }
 
-        void stackEm(String input1)
+        /*
+        void stackMessages(String input1)
         {
             for (int i = 0; i < 74; i++)
             {
@@ -79,7 +84,7 @@ namespace youtube_trivia_bot
             }
             recentMessages[0] = input1;
         }
-
+        */
         public string getScores()
         {
             string[] Entry = File.ReadAllLines(ScoresFile);
@@ -124,7 +129,7 @@ namespace youtube_trivia_bot
 
         public int getUserScore(String userName)
         {
-            int theirScore = 0;
+            int userScore = 0;
             int counter = 0;
             string myLine = "";
             System.IO.StreamReader file = new System.IO.StreamReader(ScoresFile);
@@ -134,18 +139,18 @@ namespace youtube_trivia_bot
                 if (myLine.Contains(userName))
                 {
                     string[] values = myLine.Split(',');
-                    Int32.TryParse(values[1], out theirScore);
+                    Int32.TryParse(values[1], out userScore);
                 }
                 counter++;
             }
 
             file.Close();
-            return theirScore;
+            return userScore;
         }
 
         public void addPoint(String userName)
         {
-            int temp2 = 0;
+            int val1 = 0;
             int counter = 0;
             int foundLine = -1;
             string myLine = "";
@@ -160,9 +165,9 @@ namespace youtube_trivia_bot
                 {
                     foundLine = counter;
                     string[] values = myLine.Split(',');
-                    Int32.TryParse(values[1], out temp2);
-                    temp2++;
-                    replacement = values[0] + "," + temp2;
+                    Int32.TryParse(values[1], out val1);
+                    val1++;
+                    replacement = values[0] + "," + val1;
                 }
                 counter++;
             }
@@ -208,172 +213,19 @@ namespace youtube_trivia_bot
             currentAnswer = answerLines[currentQuestionLine];
         }
 
-        void Timer1_Tick(object state)
-        {
-            try
-            {
-                getMsg(currentAnswer);
-                Console.WriteLine(DateTime.Now + " getting new messages");
-            }
-            catch (AggregateException ex)
-            {
-                foreach (var e in ex.InnerExceptions)
-                {
-                    Console.WriteLine("Error: " + e.Message);
-                }
-            }
-            GC.Collect();
-            Thread.Sleep(500);
-        }
-
-        void Timer3_Tick(object state)
-        {
-            try
-            {
-                startUpMsgHoldBack = 0;
-                Console.WriteLine("Messages now allowed to be sent.");
-                Timer3.Change(Timeout.Infinite, Timeout.Infinite);
-            }
-            catch (AggregateException ex)
-            {
-                foreach (var e in ex.InnerExceptions)
-                {
-                    Console.WriteLine("Error: " + e.Message);
-                }
-            }
-            GC.Collect();
-            Thread.Sleep(500);
-        }
-
-        void Timer4_Tick(object state)
-        {
-            try
-            {
-                sendMsg("Commands:  !trivia  !stop  !myscore ");
-            }
-            catch (AggregateException ex)
-            {
-                foreach (var e in ex.InnerExceptions)
-                {
-                    Console.WriteLine("Error: " + e.Message);
-                }
-            }
-            GC.Collect();
-            Thread.Sleep(500);
-        }
-
-        void Timer2_Tick(object state)
-        {
-            if (done == 1)
-            {
-                getQuestion();
-                getAnswer();
-                generateHints();
-                stage = 0;
-                done = 0;
-                questionAnswered = 0;
-            }
-            else if (stage == 0 && done != 1)
-            {
-                stage++;
-                askTime = DateTime.Now;
-                try
-                {
-                    msgToSend = currentQuestion + "?";
-                    sendMsg(msgToSend);
-                }
-                catch (AggregateException ex)
-                {
-                    foreach (var e in ex.InnerExceptions)
-                    {
-                        Console.WriteLine("Error: " + e.Message);
-                    }
-                }
-                GC.Collect();
-                Thread.Sleep(500);
-            }
-            else if (stage == 1 && done != 1)
-            {
-                stage++;
-                try
-                {
-                    // sendMsg("hint 1");
-                }
-                catch (AggregateException ex)
-                {
-                    foreach (var e in ex.InnerExceptions)
-                    {
-                        Console.WriteLine("Error: " + e.Message);
-                    }
-                }
-                GC.Collect();
-                Thread.Sleep(500);
-            }
-            else if (stage == 2 && done != 1)
-            {
-                stage++;
-                try
-                {
-                    sendMsg("Hint: " + hint1);
-                }
-                catch (AggregateException ex)
-                {
-                    foreach (var e in ex.InnerExceptions)
-                    {
-                        Console.WriteLine("Error: " + e.Message);
-                    }
-                }
-                GC.Collect();
-                Thread.Sleep(500);
-            }
-            else if (stage == 3 && done != 1)
-            {
-                stage++;
-                try
-                {
-                    // sendMsg("hint 3");
-                }
-                catch (AggregateException ex)
-                {
-                    foreach (var e in ex.InnerExceptions)
-                    {
-                        Console.WriteLine("Error: " + e.Message);
-                    }
-                }
-                GC.Collect();
-                Thread.Sleep(500);
-            }
-            else if (stage == 4 && done != 1)
-            {
-                stage = 0;
-                done = 1;
-                try
-                {
-                    sendMsg("Time is up! The correct answer was:  " + currentAnswer);
-                }
-                catch (AggregateException ex)
-                {
-                    foreach (var e in ex.InnerExceptions)
-                    {
-                        Console.WriteLine("Error: " + e.Message);
-                    }
-                }
-                GC.Collect();
-                Thread.Sleep(500);
-            }
-        }
-
         private void start()
         {
-            Timer1 = new Timer(Timer1_Tick, null, 3000,2000);
-            Timer3 = new Timer(Timer3_Tick, null, 15000, 15000);
-            Timer4 = new Timer(Timer4_Tick, null, 30000, 3600000);
+            Console.WriteLine("Starting game timers.");
+            Timer1 = new Timer(Timer1_Tick, null, 3000, 2000);        // Retrieves channel messages every 2 seconds.
+            Timer3 = new Timer(Timer3_Tick, null, 15000, 15000);      // Asks trivia question, waits 15 seconds, gives hint, then gives answer.
+            Timer4 = new Timer(Timer4_Tick, null, 30000, 3600000);    // Prints available commands to the channel. 
+            Console.WriteLine("Loading configuration file.");
             LoadConfig();
         }
 
     public async Task sendMsg(string myMessage)
         {
-            if (startUpMsgHoldBack == 0)
+            if (warmupDelay == 0)
             {
                 Console.WriteLine("Sent Message: " + myMessage);
                 UserCredential credential;
@@ -454,7 +306,7 @@ namespace youtube_trivia_bot
                 var timeSince = now - messageTime;
                 int toSeconds = timeSince.Seconds;
 
-                if (displayName != config.DisplayName && recentMessages.Contains(messageId).Equals(false) && startUpMsgHoldBack == 0)
+                if (displayName != config.DisplayName && recentMessages.Contains(messageId).Equals(false) && warmupDelay == 0)
                 {
                     Console.WriteLine("recent message: " + messageTime + " Delay: " + toSeconds + "  " + displayMessage);
 
@@ -462,8 +314,8 @@ namespace youtube_trivia_bot
                     {
                         questionAnswered = 1;
                         done = 1;
-                        String output1 = "You got it, " + displayName + "! [" + toSeconds + "secs] The correct answer was: " + curAnswer + ".";
-                        sendMsg(output1);
+                        String msg = "You got it, " + displayName + "! [" + toSeconds + "secs] The correct answer was: " + curAnswer + ".";
+                        await sendMsg(msg);
                         addPoint(displayName);
                     }
                     else if (displayMessage.Contains("!trivia"))
@@ -471,35 +323,191 @@ namespace youtube_trivia_bot
                         done = 1;
                         stage = 0;
                         String msg = "Trivia Bot started! First question coming up...";
-                        sendMsg(msg);
+                        await sendMsg(msg);
                         Timer2 = new Timer(new TimerCallback(Timer2_Tick), null, 0, 10000);
                     }
                     else if (displayMessage.Contains("!stop"))
                     {
                         done = 1;
                         String msg = "Trivia Stopped by " + displayName;
-                        sendMsg(msg);
+                        await sendMsg(msg);
                         Timer2.Change(Timeout.Infinite, Timeout.Infinite);
                     }
                     else if (displayMessage.Contains("!myscore"))
                     {
-                        int s1 = getUserScore(displayName);
-                        String msg = displayName + "'s score: " + s1;
-                        sendMsg(msg);
+                        int score = getUserScore(displayName);
+                        String msg = displayName + "'s score: " + score;
+                        await sendMsg(msg);
                     }
                     else if (displayMessage.Contains("!add"))
                     {
                         addQuestion(displayMessage);
                         String msg = "Question added.";
-                        sendMsg(msg);
+                        await sendMsg(msg);
                     }
                     else if (displayMessage.Contains("!highscores"))
                     {
-                        string t4 = getScores();
-                        sendMsg(t4);
+                        string msg = getScores();
+                        await sendMsg(msg);
                     }
                 }
             }
+        }
+
+        void Timer1_Tick(object state)
+        {
+            try
+            {
+                getMsg(currentAnswer);
+                Console.WriteLine(DateTime.Now + " getting new Youtube livechat messages");
+            }
+            catch (AggregateException ex)
+            {
+                foreach (var e in ex.InnerExceptions)
+                {
+                    Console.WriteLine("Error: " + e.Message);
+                }
+            }
+            GC.Collect();
+            Thread.Sleep(500);
+        }
+
+        void Timer2_Tick(object state)
+        {
+            if (done == 1)
+            {
+                getQuestion();
+                getAnswer();
+                generateHints();
+                stage = 0;
+                done = 0;
+                questionAnswered = 0;
+            }
+            else if (stage == 0 && done != 1)
+            {
+                stage++;
+                askTime = DateTime.Now;
+                try
+                {
+                    string msg = currentQuestion + "?";
+                    sendMsg(msg);
+                }
+                catch (AggregateException ex)
+                {
+                    foreach (var e in ex.InnerExceptions)
+                    {
+                        Console.WriteLine("Error: " + e.Message);
+                    }
+                }
+                GC.Collect();
+                Thread.Sleep(500);
+            }
+            else if (stage == 1 && done != 1)
+            {
+                stage++;
+                try
+                {
+                    // sendMsg("hint");
+                    // Additional hints can be added here in the future if desired.
+                }
+                catch (AggregateException ex)
+                {
+                    foreach (var e in ex.InnerExceptions)
+                    {
+                        Console.WriteLine("Error: " + e.Message);
+                    }
+                }
+                GC.Collect();
+                Thread.Sleep(500);
+            }
+            else if (stage == 2 && done != 1)
+            {
+                stage++;
+                try
+                {
+                    sendMsg("Hint: " + hint1);
+                }
+                catch (AggregateException ex)
+                {
+                    foreach (var e in ex.InnerExceptions)
+                    {
+                        Console.WriteLine("Error: " + e.Message);
+                    }
+                }
+                GC.Collect();
+                Thread.Sleep(500);
+            }
+            else if (stage == 3 && done != 1)
+            {
+                stage++;
+                try
+                {
+                    // sendMsg("hint");
+                    // Additional hints can be added here in the future if desired.
+                }
+                catch (AggregateException ex)
+                {
+                    foreach (var e in ex.InnerExceptions)
+                    {
+                        Console.WriteLine("Error: " + e.Message);
+                    }
+                }
+                GC.Collect();
+                Thread.Sleep(500);
+            }
+            else if (stage == 4 && done != 1)
+            {
+                stage = 0;
+                done = 1;
+                try
+                {
+                    sendMsg("Time is up! The correct answer was:  " + currentAnswer);
+                }
+                catch (AggregateException ex)
+                {
+                    foreach (var e in ex.InnerExceptions)
+                    {
+                        Console.WriteLine("Error: " + e.Message);
+                    }
+                }
+                GC.Collect();
+                Thread.Sleep(500);
+            }
+        }
+        void Timer3_Tick(object state)
+        {
+            try
+            {
+                warmupDelay = 0;
+                Console.WriteLine("Messages now allowed to be sent to Youtube chat.");
+                Timer3.Change(Timeout.Infinite, Timeout.Infinite);
+            }
+            catch (AggregateException ex)
+            {
+                foreach (var e in ex.InnerExceptions)
+                {
+                    Console.WriteLine("Error: " + e.Message);
+                }
+            }
+            GC.Collect();
+            Thread.Sleep(500);
+        }
+
+        void Timer4_Tick(object state)
+        {
+            try
+            {
+                sendMsg("Commands:  !trivia  !stop  !myscore ");
+            }
+            catch (AggregateException ex)
+            {
+                foreach (var e in ex.InnerExceptions)
+                {
+                    Console.WriteLine("Error: " + e.Message);
+                }
+            }
+            GC.Collect();
+            Thread.Sleep(500);
         }
     }
 }
