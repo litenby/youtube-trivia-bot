@@ -18,7 +18,9 @@ namespace youtube_trivia_bot
 {
     internal class TriviaBot
     {
-        
+        private YouTubeService ytService;
+        private UserCredential credential;
+
         int firstConnect = 0;
         int currentQuestionLine = 0;
         int stage = 0;
@@ -213,7 +215,7 @@ namespace youtube_trivia_bot
             currentAnswer = answerLines[currentQuestionLine];
         }
 
-        private void start()
+        private async void start()
         {
             Console.WriteLine("Starting game timers.");
             Timer1 = new Timer(Timer1_Tick, null, 3000, 2000);        // Retrieves channel messages every 2 seconds.
@@ -221,6 +223,23 @@ namespace youtube_trivia_bot
             Timer4 = new Timer(Timer4_Tick, null, 30000, 3600000);    // Prints available commands to the channel. 
             Console.WriteLine("Loading configuration file.");
             LoadConfig();
+
+            using (var stream = new FileStream(ClientSecretsFile, FileMode.Open, FileAccess.Read))
+            {
+                credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
+                    GoogleClientSecrets.Load(stream).Secrets,
+                    new[] { YouTubeService.Scope.Youtube },
+                    "user",
+                    CancellationToken.None,
+                    new FileDataStore(this.GetType().ToString())
+                );
+            }
+
+            ytService = new YouTubeService(new BaseClientService.Initializer()
+            {
+                HttpClientInitializer = credential,
+                ApplicationName = this.GetType().ToString()
+            });
         }
 
     public async Task sendMsg(string myMessage)
@@ -228,6 +247,7 @@ namespace youtube_trivia_bot
             if (warmupDelay == 0)
             {
                 Console.WriteLine("Sent Message: " + myMessage);
+                /*
                 UserCredential credential;
                 using (var stream = new FileStream(ClientSecretsFile, FileMode.Open, FileAccess.Read))
                 {
@@ -240,14 +260,16 @@ namespace youtube_trivia_bot
                     );
                 }
 
-                firstConnect = 1;
+                
 
                 var youtubeService = new YouTubeService(new BaseClientService.Initializer()
                 {
                     HttpClientInitializer = credential,
                     ApplicationName = this.GetType().ToString()
                 });
+                */
 
+                firstConnect = 1;
                 LiveChatMessage comments = new LiveChatMessage();
                 LiveChatMessageSnippet mySnippet = new LiveChatMessageSnippet();
                 LiveChatTextMessageDetails txtDetails = new LiveChatTextMessageDetails();
@@ -256,7 +278,7 @@ namespace youtube_trivia_bot
                 mySnippet.LiveChatId = config.LiveChatId;
                 mySnippet.Type = "textMessageEvent";
                 comments.Snippet = mySnippet;
-                comments = await youtubeService.LiveChatMessages.Insert(comments, "snippet").ExecuteAsync();
+                comments = await ytService.LiveChatMessages.Insert(comments, "snippet").ExecuteAsync();
             }
             else
             {
@@ -266,6 +288,7 @@ namespace youtube_trivia_bot
 
         public async Task getMsg(String curAnswer)
         {
+            /*
             UserCredential credential;
             using (var stream = new FileStream(ClientSecretsFile, FileMode.Open, FileAccess.Read))
             {
@@ -283,6 +306,7 @@ namespace youtube_trivia_bot
                 HttpClientInitializer = credential,
                 ApplicationName = this.GetType().ToString()
             });
+            */
 
             String liveChatId = config.LiveChatId;
             var chatMessages = ytService.LiveChatMessages.List(liveChatId, "id,snippet,authorDetails");
