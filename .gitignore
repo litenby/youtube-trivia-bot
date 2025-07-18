@@ -1,18 +1,44 @@
-# Ignore sensitive config files
+# Sensitive files
 appsettings.json
 client_secrets.json
 *.tokenstore/
 tokenstore/
 AppConfig.cs 
 
-# Ignore build output
+# Build output
 bin/
 obj/
+*.log
+*.cache
+*.db
+*.tmp
+
+# NuGet packages
+/packages/
+*.nupkg
 
 # Visual Studio files
+.vs/
+.vscode/
 *.user
 *.suo
 *.userprefs
-.vscode/
-/.vs
-/obj
+*.userosscache
+*.sln.docstates
+*.ide
+
+# Rider IDE 
+.idea/
+
+# Docker-related files
+*.tar
+*.img
+*.container
+*.pid
+*.log
+
+# Docker Compose override files 
+docker-compose.override.yml
+
+# Docker volumes 
+volumes/
