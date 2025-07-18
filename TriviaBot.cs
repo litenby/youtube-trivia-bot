@@ -528,6 +528,27 @@ namespace youtube_trivia_bot
             GC.Collect();
             Thread.Sleep(500);
         }
+
+        public void Disconnect()
+        {
+            Log?.Invoke("Disconnecting from YouTube and stopping all timers.");
+
+            Timer1?.Change(Timeout.Infinite, Timeout.Infinite);
+            Timer2?.Change(Timeout.Infinite, Timeout.Infinite);
+            Timer3?.Change(Timeout.Infinite, Timeout.Infinite);
+            Timer4?.Change(Timeout.Infinite, Timeout.Infinite);
+
+            Timer1?.Dispose();
+            Timer2?.Dispose();
+            Timer3?.Dispose();
+            Timer4?.Dispose();
+
+            ytService = null;
+            credential = null;
+
+            Log?.Invoke("TriviaBot has been disconnected.");
+        }
+
     }
 }
 

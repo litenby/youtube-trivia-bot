@@ -22,17 +22,22 @@ namespace youtube_trivia_bot
             InitializeComponent();
         }
 
-        private void Form1_Load(object sender, EventArgs e)
-        {
-
-        }
-
         private void button1_Click(object sender, EventArgs e)
         {
             bot = new TriviaBot();
             bot.Log = message => Invoke((Action)(() => logTextBox.AppendText(message + Environment.NewLine)));
-            
+
             bot.Start();
+
+            button1.Enabled = false;
+            button2.Enabled = true;
+        }
+
+        private void button2_Click(object sender, EventArgs e)
+        {
+            bot?.Disconnect();
+            button1.Enabled = true;
+            button2.Enabled = false;
         }
     }
 }
