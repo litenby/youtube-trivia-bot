@@ -42,3 +42,6 @@ docker-compose.override.yml
 
 # Docker volumes 
 volumes/
+
+# Ignore publish output
+publish/
