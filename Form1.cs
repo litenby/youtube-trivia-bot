@@ -39,5 +39,15 @@ namespace youtube_trivia_bot
             button1.Enabled = true;
             button2.Enabled = false;
         }
+
+        private void Form1_Load(object sender, EventArgs e)
+        {
+
+        }
+
+        private void logTextBox_TextChanged(object sender, EventArgs e)
+        {
+
+        }
     }
 }

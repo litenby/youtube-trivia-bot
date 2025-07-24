@@ -241,27 +241,6 @@ namespace youtube_trivia_bot
             if (warmupDelay == 0)
             {
                 Log?.Invoke("Sent Message: " + myMessage);
-                /*
-                UserCredential credential;
-                using (var stream = new FileStream(ClientSecretsFile, FileMode.Open, FileAccess.Read))
-                {
-                    credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
-                        GoogleClientSecrets.Load(stream).Secrets,
-                        new[] { YouTubeService.Scope.Youtube },
-                        "user",
-                        CancellationToken.None,
-                        new FileDataStore(this.GetType().ToString())
-                    );
-                }
-
-                
-
-                var youtubeService = new YouTubeService(new BaseClientService.Initializer()
-                {
-                    HttpClientInitializer = credential,
-                    ApplicationName = this.GetType().ToString()
-                });
-                */
 
                 firstConnect = 1;
                 LiveChatMessage comments = new LiveChatMessage();
@@ -282,25 +261,6 @@ namespace youtube_trivia_bot
 
         public async Task getMsg(String curAnswer)
         {
-            /*
-            UserCredential credential;
-            using (var stream = new FileStream(ClientSecretsFile, FileMode.Open, FileAccess.Read))
-            {
-                credential = await GoogleWebAuthorizationBroker.AuthorizeAsync(
-                    GoogleClientSecrets.Load(stream).Secrets,
-                    new[] { YouTubeService.Scope.Youtube },
-                    "user",
-                    CancellationToken.None,
-                    new FileDataStore(this.GetType().ToString())
-                );
-            }
-
-            var ytService = new YouTubeService(new BaseClientService.Initializer()
-            {
-                HttpClientInitializer = credential,
-                ApplicationName = this.GetType().ToString()
-            });
-            */
 
             String liveChatId = config.LiveChatId;
             var chatMessages = ytService.LiveChatMessages.List(liveChatId, "id,snippet,authorDetails");
